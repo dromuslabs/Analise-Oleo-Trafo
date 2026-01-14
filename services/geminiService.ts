@@ -1,19 +1,24 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
-import { TransformerGroup, TransformerReading, TrendAnalysis } from "../types";
-
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+import { TransformerGroup, TrendAnalysis } from "../types";
 
 export const getAIInsights = async (groups: TransformerGroup[]) => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  
   const summary = groups.map(g => ({
     sn: g.sn,
     tag: g.tag,
-    currentGases: { c2h2: g.lastReading.c2h2, h2: g.lastReading.h2 },
-    trend: g.history.length > 1 ? "Analisando histórico de " + g.history.length + " coletas" : "Primeira coleta"
+    currentGases: { 
+      c2h2: g.lastReading.c2h2, 
+      h2: g.lastReading.h2,
+      tcg: (g.lastReading.h2 + g.lastReading.ch4 + g.lastReading.c2h2 + g.lastReading.c2h4 + g.lastReading.c2h6 + g.lastReading.co)
+    },
+    status: g.status
   }));
 
-  const prompt = `Como especialista em DGA (IEEE C57.104), analise o estado atual desta frota de transformadores: ${JSON.stringify(summary)}. 
-  Forneça um resumo executivo de saúde, identifique SNs críticos e recomende ações imediatas.`;
+  const prompt = `Atue como um Engenheiro Especialista em Diagnóstico de Transformadores (DGA - IEEE C57.104). 
+  Analise esta frota: ${JSON.stringify(summary)}. 
+  Forneça um resumo executivo de saúde, identifique equipamentos em estado crítico e recomende ações imediatas (ex: coleta extra, redução de carga, inspeção interna).`;
 
   try {
     const response = await ai.models.generateContent({
@@ -40,10 +45,15 @@ export const getAIInsights = async (groups: TransformerGroup[]) => {
 };
 
 export const analyzeTrends = async (group: TransformerGroup): Promise<TrendAnalysis | null> => {
-  const prompt = `Analise o HISTÓRICO COMPLETO de gases do transformador SN: ${group.sn} (TAG: ${group.tag}).
-  Dados históricos (ordenados por data): ${JSON.stringify(group.history)}.
-  Considere a taxa de evolução dos gases ppm/mês. Verifique se há falhas térmicas ou elétricas em desenvolvimento.
-  Responda em JSON com summary, patterns (lista de strings) e riskLevel (Baixo, Médio, Alto).`;
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
+  const prompt = `Analise a tendência temporal de gases do transformador SN: ${group.sn}.
+  Histórico: ${JSON.stringify(group.history)}.
+  Calcule a taxa de geração de gases (ppm/dia). Identifique se há indícios de:
+  1. Arqueamento (C2H2 alto)
+  2. Descargas Parciais (H2 alto)
+  3. Sobreaquecimento Térmico (C2H4/CH4 altos)
+  Responda em JSON rigoroso.`;
 
   try {
     const response = await ai.models.generateContent({
@@ -56,7 +66,8 @@ export const analyzeTrends = async (group: TransformerGroup): Promise<TrendAnaly
           properties: {
             summary: { type: Type.STRING },
             patterns: { type: Type.ARRAY, items: { type: Type.STRING } },
-            riskLevel: { type: Type.STRING, enum: ["Baixo", "Médio", "Alto"] }
+            riskLevel: { type: Type.STRING, enum: ["Baixo", "Médio", "Alto"] },
+            detectedFault: { type: Type.STRING }
           },
           required: ["summary", "patterns", "riskLevel"]
         }

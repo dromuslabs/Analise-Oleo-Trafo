@@ -6,11 +6,11 @@ export enum TransformerStatus {
 }
 
 export interface TransformerReading {
-  id: string; // ID da linha na planilha
-  sn: string; // Chave única do transformador
+  id: string;
+  sn: string;
   tag: string;
   local: string;
-  data: string; // Data da coleta
+  data: string;
   h2: number;
   ch4: number;
   c2h2: number;
@@ -19,6 +19,7 @@ export interface TransformerReading {
   co: number;
   co2: number;
   temperaturaOleo?: number;
+  tcg?: number; // Total Combustible Gases
 }
 
 export interface TransformerGroup {
@@ -34,14 +35,11 @@ export interface TrendAnalysis {
   summary: string;
   patterns: string[];
   riskLevel: 'Baixo' | 'Médio' | 'Alto';
+  detectedFault?: string;
 }
 
 export interface InsightReport {
   overallHealth: string;
   criticalIssues: string[];
   recommendations: string[];
-}
-
-export interface SheetyResponse {
-  trafo: any[];
 }
