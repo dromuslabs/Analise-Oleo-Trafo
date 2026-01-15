@@ -10,9 +10,18 @@ const STATE = {
   activeModal: null
 };
 
-// Inicialização da IA seguindo estritamente as diretrizes
-// Assume-se que process.env.API_KEY será provido pelo ambiente de execução (Vercel/Preview)
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Acesso seguro à chave de API para evitar erro de "process is not defined"
+const getApiKey = () => {
+  try {
+    // @ts-ignore
+    return typeof process !== 'undefined' ? process.env.API_KEY : undefined;
+  } catch (e) {
+    return undefined;
+  }
+};
+
+const apiKey = getApiKey();
+const ai = new GoogleGenAI({ apiKey: apiKey || "" });
 
 // --- Lógica de Dados ---
 
@@ -48,7 +57,7 @@ async function fetchData() {
     STATE.groups = processRows(rows);
     renderDashboard();
     
-    // Tenta obter insights globais - o erro de API será tratado dentro da função
+    // Tenta obter insights globais
     getGlobalAIInsights();
 
   } catch (err: any) {
@@ -119,6 +128,8 @@ async function getGlobalAIInsights() {
   const summary = STATE.groups.map((g: any) => ({ sn: g.sn, status: g.status, c2h2: g.lastReading.c2h2 }));
 
   try {
+    if (!apiKey) throw new Error("A variável process.env.API_KEY não foi detectada no navegador.");
+
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: `Analise a frota de transformadores: ${JSON.stringify(summary)}. Forneça um resumo de saúde e recomendações em formato JSON.`,
@@ -149,12 +160,12 @@ async function getGlobalAIInsights() {
       </div>
     `;
   } catch (err: any) {
-    console.error("Falha na chamada da IA (Insights Globais):", err);
+    console.warn("Falha na chamada da IA (Insights Globais):", err);
     container.innerHTML = `
       <div class="p-4 border border-slate-800 rounded-2xl bg-slate-900/50">
-        <p class="text-slate-500 text-[10px] uppercase font-bold mb-2">Status da IA</p>
-        <p class="text-slate-400 text-xs">Aguardando chave de API válida no Vercel/Ambiente.</p>
-        <p class="text-[10px] text-slate-600 mt-2 font-mono">${err.message || ''}</p>
+        <p class="text-rose-500 text-[10px] uppercase font-bold mb-2">Erro de Configuração IA</p>
+        <p class="text-slate-400 text-xs leading-relaxed">Não foi possível acessar a IA. Verifique se a API_KEY foi definida no Vercel e se você realizou um novo <b>Deploy</b>.</p>
+        <p class="text-[10px] text-slate-600 mt-3 font-mono break-words">${err.message || 'Chave indefinida'}</p>
       </div>
     `;
   }
@@ -165,6 +176,8 @@ async function analyzeTransformerTrends(group: any) {
   if (!container) return;
 
   try {
+    if (!apiKey) throw new Error("Chave de API ausente.");
+
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: `Analise o histórico DGA do transformador ${group.tag} (SN: ${group.sn}). 
@@ -206,11 +219,10 @@ async function analyzeTransformerTrends(group: any) {
       </div>
     `;
   } catch (err: any) {
-    console.error("Erro na análise individual via Gemini:", err);
     container.innerHTML = `
       <div class="p-6 text-center border border-slate-800 rounded-3xl">
-        <p class="text-slate-500 text-sm">Análise de IA indisponível para este ativo no momento.</p>
-        <p class="text-[10px] text-slate-700 mt-2">Verifique as Variáveis de Ambiente no Dashboard do Vercel.</p>
+        <p class="text-slate-500 text-sm">Análise de IA indisponível para este ativo.</p>
+        <p class="text-[10px] text-slate-700 mt-2">Erro: ${err.message || 'API Key Error'}</p>
       </div>
     `;
   }
@@ -398,9 +410,9 @@ function renderChart(history: any[]) {
         <div class="space-y-4 text-sm text-slate-400 leading-relaxed text-left">
           <p>1. Vá ao dashboard da <span class="text-white font-bold">Vercel</span>.</p>
           <p>2. Entre no seu projeto e vá em <span class="text-indigo-400">Settings > Environment Variables</span>.</p>
-          <p>3. Adicione a chave <span class="font-bold text-white">API_KEY</span>.</p>
-          <p>4. Cole o valor da sua chave Gemini.</p>
-          <p>5. Faça um <span class="text-white font-bold">Redeploy</span> na aba "Deployments" para aplicar a variável.</p>
+          <p>3. Adicione a variável <span class="font-bold text-white">API_KEY</span>.</p>
+          <p>4. Em <b>Deployments</b>, escolha o último e clique em <b>Redeploy</b>.</p>
+          <p class="text-xs text-amber-400 mt-4">Nota: O Vercel não atualiza variáveis de ambiente automaticamente em sites já publicados sem um novo redeploy.</p>
         </div>
         <button onclick="document.getElementById('guide-container').classList.add('hidden')" class="mt-8 bg-indigo-600 hover:bg-indigo-500 w-full py-3 rounded-xl font-bold transition-all shadow-lg shadow-indigo-600/20">Entendi!</button>
       </div>

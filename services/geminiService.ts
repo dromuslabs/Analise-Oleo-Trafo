@@ -2,8 +2,20 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { TransformerGroup, TrendAnalysis } from "../types";
 
+const getApiKey = () => {
+  try {
+    // @ts-ignore
+    return typeof process !== 'undefined' ? process.env.API_KEY : undefined;
+  } catch (e) {
+    return undefined;
+  }
+};
+
 export const getAIInsights = async (groups: TransformerGroup[]) => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const apiKey = getApiKey();
+  if (!apiKey) return null;
+
+  const ai = new GoogleGenAI({ apiKey });
   
   const summary = groups.map(g => ({
     sn: g.sn,
@@ -18,11 +30,11 @@ export const getAIInsights = async (groups: TransformerGroup[]) => {
 
   const prompt = `Atue como um Engenheiro Especialista em Diagnóstico de Transformadores (DGA - IEEE C57.104). 
   Analise esta frota: ${JSON.stringify(summary)}. 
-  Forneça um resumo executivo de saúde, identifique equipamentos em estado crítico e recomende ações imediatas (ex: coleta extra, redução de carga, inspeção interna).`;
+  Forneça um resumo executivo de saúde, identifique equipamentos em estado crítico e recomende ações imediatas.`;
 
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-pro-preview",
+      model: "gemini-3-flash-preview",
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -45,19 +57,19 @@ export const getAIInsights = async (groups: TransformerGroup[]) => {
 };
 
 export const analyzeTrends = async (group: TransformerGroup): Promise<TrendAnalysis | null> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const apiKey = getApiKey();
+  if (!apiKey) return null;
+
+  const ai = new GoogleGenAI({ apiKey });
 
   const prompt = `Analise a tendência temporal de gases do transformador SN: ${group.sn}.
   Histórico: ${JSON.stringify(group.history)}.
-  Calcule a taxa de geração de gases (ppm/dia). Identifique se há indícios de:
-  1. Arqueamento (C2H2 alto)
-  2. Descargas Parciais (H2 alto)
-  3. Sobreaquecimento Térmico (C2H4/CH4 altos)
+  Calcule a taxa de geração de gases (ppm/dia). Identifique se há indícios de falha.
   Responda em JSON rigoroso.`;
 
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-pro-preview",
+      model: "gemini-3-flash-preview",
       contents: prompt,
       config: {
         responseMimeType: "application/json",
