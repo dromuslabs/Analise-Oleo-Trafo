@@ -1,6 +1,11 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
 
+// POLYFILL: Previne erro "process is not defined" em hosts estáticos (Vercel/GitHub)
+if (typeof (window as any).process === 'undefined') {
+  (window as any).process = { env: { API_KEY: '' } };
+}
+
 // Configurações e Estado
 const STATE = {
   groups: [],
@@ -10,32 +15,72 @@ const STATE = {
   activeModal: null
 };
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Inicialização segura do Gemini
+const getAiClient = () => {
+  const apiKey = process.env.API_KEY;
+  if (!apiKey) {
+    console.warn("Gemini API Key não encontrada nas variáveis de ambiente.");
+    return null;
+  }
+  return new GoogleGenAI({ apiKey });
+};
+
+const ai = getAiClient();
 
 // --- Lógica de Dados ---
 
 async function fetchData() {
   const btn = document.getElementById('refresh-btn') as HTMLButtonElement;
   const icon = document.getElementById('refresh-icon') as HTMLElement;
+  const listContainer = document.getElementById('list-container');
   
+  console.log("Iniciando fetch em:", STATE.apiUrl);
+
   STATE.loading = true;
   if (btn) btn.disabled = true;
   if (icon) icon.classList.add('animate-spin');
 
   try {
     const response = await fetch(STATE.apiUrl);
-    if (!response.ok) throw new Error('Falha na Planilha');
-    const data = await response.json();
     
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Erro na Planilha (${response.status}): ${errorText || 'Verifique se a API Sheety está pública.'}`);
+    }
+
+    const data = await response.json();
+    console.log("Dados recebidos da Sheety:", data);
+    
+    // Sheety usa o nome da aba como chave (ex: data.trafo ou data.folha1)
     const key = Object.keys(data)[0];
     const rows = data[key] || [];
     
+    if (!Array.isArray(rows)) {
+      throw new Error("A API Sheety não retornou uma lista válida de dados.");
+    }
+
     STATE.groups = processRows(rows);
     renderDashboard();
-    getGlobalAIInsights();
-  } catch (err) {
-    console.error(err);
-    alert('Erro ao carregar dados da planilha. Verifique a URL nas configurações.');
+    
+    if (ai) {
+      getGlobalAIInsights();
+    } else {
+      const aiContainer = document.getElementById('ai-insights-container');
+      if (aiContainer) aiContainer.innerHTML = '<p class="text-slate-500 text-sm">IA desativada (falta API_KEY no deploy).</p>';
+    }
+
+  } catch (err: any) {
+    console.error("Erro completo:", err);
+    if (listContainer) {
+      listContainer.innerHTML = `
+        <div class="p-12 text-center">
+          <p class="text-rose-400 font-bold mb-2">Falha na Sincronização</p>
+          <p class="text-slate-500 text-sm mb-4">${err.message}</p>
+          <button onclick="app.configApi()" class="text-indigo-400 underline text-xs">Reconfigurar URL da Planilha</button>
+        </div>
+      `;
+    }
+    alert(`Erro ao carregar planilha: ${err.message}`);
   } finally {
     STATE.loading = false;
     if (btn) btn.disabled = false;
@@ -45,10 +90,11 @@ async function fetchData() {
   }
 }
 
-function processRows(rows) {
-  const grouped = {};
+function processRows(rows: any[]) {
+  const grouped: { [key: string]: any[] } = {};
   rows.forEach(row => {
-    const sn = (row.sn || row.serie || 'N/A').toString();
+    // Tenta diferentes nomes de colunas comuns
+    const sn = (row.sn || row.serie || row.id || 'N/A').toString();
     if (!grouped[sn]) grouped[sn] = [];
     
     const reading = {
@@ -73,7 +119,14 @@ function processRows(rows) {
     if (last.c2h2 > 2 || last.h2 > 500) status = 'Crítico';
     else if (last.c2h2 > 0.5 || last.h2 > 100) status = 'Alerta';
 
-    return { sn, tag: last.tag || 'EQUIP', local: last.local || 'Planta', history, lastReading: last, status };
+    return { 
+      sn, 
+      tag: last.tag || 'EQUIP', 
+      local: last.local || 'Planta', 
+      history, 
+      lastReading: last, 
+      status 
+    };
   });
 }
 
@@ -81,8 +134,8 @@ function processRows(rows) {
 
 async function getGlobalAIInsights() {
   const container = document.getElementById('ai-insights-container');
-  if (!container) return;
-  const summary = STATE.groups.map(g => ({ sn: g.sn, status: g.status, c2h2: g.lastReading.c2h2 }));
+  if (!container || !ai) return;
+  const summary = STATE.groups.map((g: any) => ({ sn: g.sn, status: g.status, c2h2: g.lastReading.c2h2 }));
 
   try {
     const response = await ai.models.generateContent({
@@ -111,7 +164,7 @@ async function getGlobalAIInsights() {
       <p class="text-slate-300 mb-6 text-sm leading-relaxed">${data.health}</p>
       <div class="space-y-2">
         <h4 class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Ações Recomendadas</h4>
-        ${data.actions.map(a => `<div class="flex gap-2 text-xs text-slate-400"><span class="text-emerald-500">✓</span> ${a}</div>`).join('')}
+        ${data.actions.map((a: string) => `<div class="flex gap-2 text-xs text-slate-400"><span class="text-emerald-500">✓</span> ${a}</div>`).join('')}
       </div>
     `;
   } catch (err) {
@@ -119,9 +172,9 @@ async function getGlobalAIInsights() {
   }
 }
 
-async function analyzeTransformerTrends(group) {
+async function analyzeTransformerTrends(group: any) {
   const container = document.getElementById('ai-diagnosis-container');
-  if (!container) return;
+  if (!container || !ai) return;
 
   try {
     const response = await ai.models.generateContent({
@@ -155,7 +208,7 @@ async function analyzeTransformerTrends(group) {
           </h3>
           <p class="text-slate-300 text-base leading-relaxed mb-4">${data.summary}</p>
           <div class="flex flex-wrap gap-2">
-            ${data.patterns.map(p => `<span class="bg-slate-800 text-indigo-300 text-[10px] px-3 py-1 rounded-full border border-slate-700 font-bold uppercase tracking-tighter">${p}</span>`).join('')}
+            ${data.patterns.map((p: string) => `<span class="bg-slate-800 text-indigo-300 text-[10px] px-3 py-1 rounded-full border border-slate-700 font-bold uppercase tracking-tighter">${p}</span>`).join('')}
           </div>
         </div>
         <div class="bg-slate-950/50 p-6 rounded-2xl border border-slate-800 flex flex-col items-center justify-center text-center">
@@ -180,9 +233,9 @@ function renderDashboard() {
 function renderStats() {
   const container = document.getElementById('stats-container');
   if (!container) return;
-  const criticalCount = STATE.groups.filter(g => g.status === 'Crítico').length;
-  const alertCount = STATE.groups.filter(g => g.status === 'Alerta').length;
-  const avgTemp = STATE.groups.reduce((acc, g) => acc + g.lastReading.temperaturaOleo, 0) / (STATE.groups.length || 1);
+  const criticalCount = STATE.groups.filter((g: any) => g.status === 'Crítico').length;
+  const alertCount = STATE.groups.filter((g: any) => g.status === 'Alerta').length;
+  const avgTemp = STATE.groups.reduce((acc, g: any) => acc + g.lastReading.temperaturaOleo, 0) / (STATE.groups.length || 1);
 
   const stats = [
     { label: 'Total Ativos', value: STATE.groups.length, color: 'text-indigo-400' },
@@ -208,7 +261,7 @@ function renderList() {
     return;
   }
 
-  const tableRows = STATE.groups.map(g => `
+  const tableRows = STATE.groups.map((g: any) => `
     <tr class="hover:bg-slate-800/40 border-b border-slate-800/50 transition-colors cursor-pointer" onclick="app.openDetail('${g.sn}')">
       <td class="px-6 py-4 font-bold text-white">${g.tag}<br><span class="text-[10px] text-slate-500 font-mono">${g.sn}</span></td>
       <td class="px-6 py-4 text-center text-slate-400 text-sm">${new Date(g.lastReading.data).toLocaleDateString()}</td>
@@ -238,7 +291,7 @@ function renderList() {
   `;
 }
 
-function getStatusStyle(s) {
+function getStatusStyle(s: string) {
   if (s === 'Crítico') return 'bg-rose-500/10 text-rose-400 border-rose-500/20';
   if (s === 'Alerta') return 'bg-amber-500/10 text-amber-400 border-amber-500/20';
   return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
@@ -246,8 +299,8 @@ function getStatusStyle(s) {
 
 // --- Detalhes e Gráficos ---
 
-async function openDetail(sn) {
-  const group = STATE.groups.find(g => g.sn === sn);
+async function openDetail(sn: string) {
+  const group = STATE.groups.find((g: any) => g.sn === sn);
   if (!group) return;
 
   const modal = document.getElementById('modal-container');
@@ -293,10 +346,14 @@ async function openDetail(sn) {
   `;
 
   renderChart(group.history);
-  analyzeTransformerTrends(group);
+  if (ai) analyzeTransformerTrends(group);
+  else {
+    const diag = document.getElementById('ai-diagnosis-container');
+    if (diag) diag.innerHTML = '<p class="text-slate-500">IA desativada.</p>';
+  }
 }
 
-function renderChart(history) {
+function renderChart(history: any[]) {
   const options = {
     series: [
       { name: 'Acetileno (C2H2)', data: history.map(h => h.c2h2) },
@@ -332,7 +389,7 @@ function renderChart(history) {
     if (modal) modal.classList.add('hidden');
   },
   configApi: () => {
-    const url = prompt('Cole o link da sua API Sheety:', STATE.apiUrl);
+    const url = prompt('Cole o link da sua API Sheety (HTTPS):', STATE.apiUrl);
     if (url && url.startsWith('http')) {
       STATE.apiUrl = url;
       localStorage.setItem('powergrid_api_url', url);
@@ -351,19 +408,18 @@ function renderChart(history) {
           Guia de Deploy Rápido
         </h2>
         <div class="space-y-4 text-sm text-slate-400 leading-relaxed">
-          <p>1. Crie um repositório no <span class="text-white font-bold">GitHub</span>.</p>
-          <p>2. Envie apenas o <code class="bg-slate-800 p-1 rounded text-indigo-400 font-mono">index.html</code>, <code class="bg-slate-800 p-1 rounded text-indigo-400 font-mono">index.tsx</code> e <code class="bg-slate-800 p-1 rounded text-indigo-400 font-mono">metadata.json</code>.</p>
-          <p>3. No <span class="text-white font-bold">Vercel</span>, selecione seu repositório.</p>
-          <p>4. Em "Environment Variables", adicione <span class="font-bold text-white">API_KEY</span> com sua chave Gemini.</p>
+          <p>1. No seu dashboard da <span class="text-white font-bold">Sheety</span>, certifique-se de que o método <span class="font-bold text-emerald-400">GET</span> está ativado.</p>
+          <p>2. No <span class="text-white font-bold">Vercel</span>, vá em "Settings" > "Environment Variables".</p>
+          <p>3. Adicione uma variável chamada <span class="font-bold text-white">API_KEY</span> com sua chave do Gemini.</p>
           <p class="bg-amber-500/10 border border-amber-500/20 p-3 rounded-xl text-amber-300 text-xs">
-            Certifique-se de que sua planilha no Sheety está configurada como "Public" ou sem autenticação para este dashboard.
+            Dica: Se estiver no GitHub Pages, você precisará de uma ferramenta de build ou colar a chave diretamente no código (não recomendado por segurança).
           </p>
         </div>
-        <button onclick="document.getElementById('guide-container').classList.add('hidden')" class="mt-8 bg-indigo-600 hover:bg-indigo-500 w-full py-3 rounded-xl font-bold transition-all shadow-lg shadow-indigo-600/20">Entendi, vamos lá!</button>
+        <button onclick="document.getElementById('guide-container').classList.add('hidden')" class="mt-8 bg-indigo-600 hover:bg-indigo-500 w-full py-3 rounded-xl font-bold transition-all shadow-lg shadow-indigo-600/20">Entendi!</button>
       </div>
     `;
   }
 };
 
-// Início
+// Início automático
 fetchData();

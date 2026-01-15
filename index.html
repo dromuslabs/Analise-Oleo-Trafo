@@ -17,13 +17,16 @@
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
         @keyframes pulse-soft { 0%, 100% { opacity: 0.2; } 50% { opacity: 0.4; } }
         .animate-pulse-soft { animation: pulse-soft 3s infinite; }
+        
+        /* Previne que o conteúdo "pule" antes dos dados carregarem */
+        #list-container { min-height: 200px; }
     </style>
 <script type="importmap">
 {
   "imports": {
+    "@google/genai": "https://esm.sh/@google/genai@^1.36.0",
     "react/": "https://esm.sh/react@^19.2.3/",
     "react": "https://esm.sh/react@^19.2.3",
-    "@google/genai": "https://esm.sh/@google/genai@^1.36.0",
     "recharts": "https://esm.sh/recharts@^3.6.0"
   }
 }
@@ -81,7 +84,9 @@
                         <span class="flex items-center gap-1.5 text-xs text-slate-400"><span class="w-2 h-2 rounded-full bg-rose-500"></span> Crítico</span>
                     </div>
                 </div>
-                <div id="list-container" class="glass rounded-[2rem] overflow-hidden shadow-2xl"></div>
+                <div id="list-container" class="glass rounded-[2rem] overflow-hidden shadow-2xl">
+                    <div class="p-20 text-center text-slate-500">Iniciando sistema...</div>
+                </div>
             </div>
 
             <!-- Sidebar AI -->
