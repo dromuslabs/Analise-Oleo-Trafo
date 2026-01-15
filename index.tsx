@@ -1,11 +1,6 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
 
-// POLYFILL: Previne erro "process is not defined" em hosts estáticos (Vercel/GitHub)
-if (typeof (window as any).process === 'undefined') {
-  (window as any).process = { env: { API_KEY: '' } };
-}
-
 // Configurações e Estado
 const STATE = {
   groups: [],
@@ -15,17 +10,9 @@ const STATE = {
   activeModal: null
 };
 
-// Inicialização segura do Gemini
-const getAiClient = () => {
-  const apiKey = process.env.API_KEY;
-  if (!apiKey) {
-    console.warn("Gemini API Key não encontrada nas variáveis de ambiente.");
-    return null;
-  }
-  return new GoogleGenAI({ apiKey });
-};
-
-const ai = getAiClient();
+// Inicialização da IA seguindo estritamente as diretrizes
+// Assume-se que process.env.API_KEY será provido pelo ambiente de execução (Vercel/Preview)
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 // --- Lógica de Dados ---
 
@@ -34,7 +21,7 @@ async function fetchData() {
   const icon = document.getElementById('refresh-icon') as HTMLElement;
   const listContainer = document.getElementById('list-container');
   
-  console.log("Iniciando fetch em:", STATE.apiUrl);
+  console.log("Iniciando sincronização com:", STATE.apiUrl);
 
   STATE.loading = true;
   if (btn) btn.disabled = true;
@@ -49,9 +36,8 @@ async function fetchData() {
     }
 
     const data = await response.json();
-    console.log("Dados recebidos da Sheety:", data);
     
-    // Sheety usa o nome da aba como chave (ex: data.trafo ou data.folha1)
+    // Sheety usa o nome da aba como chave
     const key = Object.keys(data)[0];
     const rows = data[key] || [];
     
@@ -62,15 +48,11 @@ async function fetchData() {
     STATE.groups = processRows(rows);
     renderDashboard();
     
-    if (ai) {
-      getGlobalAIInsights();
-    } else {
-      const aiContainer = document.getElementById('ai-insights-container');
-      if (aiContainer) aiContainer.innerHTML = '<p class="text-slate-500 text-sm">IA desativada (falta API_KEY no deploy).</p>';
-    }
+    // Tenta obter insights globais - o erro de API será tratado dentro da função
+    getGlobalAIInsights();
 
   } catch (err: any) {
-    console.error("Erro completo:", err);
+    console.error("Erro na carga de dados:", err);
     if (listContainer) {
       listContainer.innerHTML = `
         <div class="p-12 text-center">
@@ -80,7 +62,6 @@ async function fetchData() {
         </div>
       `;
     }
-    alert(`Erro ao carregar planilha: ${err.message}`);
   } finally {
     STATE.loading = false;
     if (btn) btn.disabled = false;
@@ -93,7 +74,6 @@ async function fetchData() {
 function processRows(rows: any[]) {
   const grouped: { [key: string]: any[] } = {};
   rows.forEach(row => {
-    // Tenta diferentes nomes de colunas comuns
     const sn = (row.sn || row.serie || row.id || 'N/A').toString();
     if (!grouped[sn]) grouped[sn] = [];
     
@@ -134,7 +114,8 @@ function processRows(rows: any[]) {
 
 async function getGlobalAIInsights() {
   const container = document.getElementById('ai-insights-container');
-  if (!container || !ai) return;
+  if (!container || STATE.groups.length === 0) return;
+  
   const summary = STATE.groups.map((g: any) => ({ sn: g.sn, status: g.status, c2h2: g.lastReading.c2h2 }));
 
   try {
@@ -167,21 +148,28 @@ async function getGlobalAIInsights() {
         ${data.actions.map((a: string) => `<div class="flex gap-2 text-xs text-slate-400"><span class="text-emerald-500">✓</span> ${a}</div>`).join('')}
       </div>
     `;
-  } catch (err) {
-    container.innerHTML = `<p class="text-slate-500 text-sm">Erro ao gerar insights de IA.</p>`;
+  } catch (err: any) {
+    console.error("Falha na chamada da IA (Insights Globais):", err);
+    container.innerHTML = `
+      <div class="p-4 border border-slate-800 rounded-2xl bg-slate-900/50">
+        <p class="text-slate-500 text-[10px] uppercase font-bold mb-2">Status da IA</p>
+        <p class="text-slate-400 text-xs">Aguardando chave de API válida no Vercel/Ambiente.</p>
+        <p class="text-[10px] text-slate-600 mt-2 font-mono">${err.message || ''}</p>
+      </div>
+    `;
   }
 }
 
 async function analyzeTransformerTrends(group: any) {
   const container = document.getElementById('ai-diagnosis-container');
-  if (!container || !ai) return;
+  if (!container) return;
 
   try {
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: `Analise o histórico DGA do transformador ${group.tag} (SN: ${group.sn}). 
       Histórico: ${JSON.stringify(group.history)}.
-      Identifique tendências de gases (H2, C2H2, CH4, etc) e possíveis falhas incipientes. 
+      Identifique tendências de gases e possíveis falhas incipientes. 
       Responda estritamente em JSON.`,
       config: {
         responseMimeType: "application/json",
@@ -217,9 +205,14 @@ async function analyzeTransformerTrends(group: any) {
         </div>
       </div>
     `;
-  } catch (err) {
-    console.error("Erro na análise individual:", err);
-    container.innerHTML = `<p class="text-slate-500 text-sm">Não foi possível gerar a análise individual via IA.</p>`;
+  } catch (err: any) {
+    console.error("Erro na análise individual via Gemini:", err);
+    container.innerHTML = `
+      <div class="p-6 text-center border border-slate-800 rounded-3xl">
+        <p class="text-slate-500 text-sm">Análise de IA indisponível para este ativo no momento.</p>
+        <p class="text-[10px] text-slate-700 mt-2">Verifique as Variáveis de Ambiente no Dashboard do Vercel.</p>
+      </div>
+    `;
   }
 }
 
@@ -257,7 +250,7 @@ function renderList() {
   const container = document.getElementById('list-container');
   if (!container) return;
   if (STATE.groups.length === 0) {
-    container.innerHTML = `<div class="p-20 text-center text-slate-500">Aguardando dados...</div>`;
+    container.innerHTML = `<div class="p-20 text-center text-slate-500">Nenhum dado encontrado na planilha.</div>`;
     return;
   }
 
@@ -330,7 +323,6 @@ async function openDetail(sn: string) {
         `).join('')}
       </div>
 
-      <!-- AI Diagnosis Section -->
       <div id="ai-diagnosis-container" class="bg-indigo-500/5 border border-indigo-500/20 rounded-3xl p-8 mb-10 min-h-[160px]">
         <div class="animate-pulse space-y-4">
           <div class="h-4 bg-slate-800 rounded w-1/4"></div>
@@ -346,11 +338,7 @@ async function openDetail(sn: string) {
   `;
 
   renderChart(group.history);
-  if (ai) analyzeTransformerTrends(group);
-  else {
-    const diag = document.getElementById('ai-diagnosis-container');
-    if (diag) diag.innerHTML = '<p class="text-slate-500">IA desativada.</p>';
-  }
+  analyzeTransformerTrends(group);
 }
 
 function renderChart(history: any[]) {
@@ -405,15 +393,14 @@ function renderChart(history: any[]) {
         <button onclick="document.getElementById('guide-container').classList.add('hidden')" class="absolute top-6 right-6 text-slate-500 hover:text-white"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" /></svg></button>
         <h2 class="text-xl font-bold mb-6 flex items-center gap-2">
           <svg class="w-6 h-6 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
-          Guia de Deploy Rápido
+          Guia de Deploy Vercel
         </h2>
-        <div class="space-y-4 text-sm text-slate-400 leading-relaxed">
-          <p>1. No seu dashboard da <span class="text-white font-bold">Sheety</span>, certifique-se de que o método <span class="font-bold text-emerald-400">GET</span> está ativado.</p>
-          <p>2. No <span class="text-white font-bold">Vercel</span>, vá em "Settings" > "Environment Variables".</p>
-          <p>3. Adicione uma variável chamada <span class="font-bold text-white">API_KEY</span> com sua chave do Gemini.</p>
-          <p class="bg-amber-500/10 border border-amber-500/20 p-3 rounded-xl text-amber-300 text-xs">
-            Dica: Se estiver no GitHub Pages, você precisará de uma ferramenta de build ou colar a chave diretamente no código (não recomendado por segurança).
-          </p>
+        <div class="space-y-4 text-sm text-slate-400 leading-relaxed text-left">
+          <p>1. Vá ao dashboard da <span class="text-white font-bold">Vercel</span>.</p>
+          <p>2. Entre no seu projeto e vá em <span class="text-indigo-400">Settings > Environment Variables</span>.</p>
+          <p>3. Adicione a chave <span class="font-bold text-white">API_KEY</span>.</p>
+          <p>4. Cole o valor da sua chave Gemini.</p>
+          <p>5. Faça um <span class="text-white font-bold">Redeploy</span> na aba "Deployments" para aplicar a variável.</p>
         </div>
         <button onclick="document.getElementById('guide-container').classList.add('hidden')" class="mt-8 bg-indigo-600 hover:bg-indigo-500 w-full py-3 rounded-xl font-bold transition-all shadow-lg shadow-indigo-600/20">Entendi!</button>
       </div>
