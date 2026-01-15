@@ -6,9 +6,10 @@ import TransformerList from './components/TransformerList';
 import AIAnalysisPanel from './components/AIAnalysisPanel';
 import DetailModal from './components/DetailModal';
 import ComparisonPanel from './components/ComparisonPanel';
+import DeploymentInfo from './components/DeploymentInfo';
 import { getAIInsights } from './services/geminiService';
 
-const SHEETY_API_URL = 'https://api.sheety.co/08e6cbbffee520029dcb64480d35d1a8/controleasi/trafo';
+const DEFAULT_SHEETY_API = 'https://api.sheety.co/08e6cbbffee520029dcb64480d35d1a8/controleasi/trafo';
 
 const App: React.FC = () => {
   const [groups, setGroups] = useState<TransformerGroup[]>([]);
@@ -18,12 +19,13 @@ const App: React.FC = () => {
   const [selectedGroup, setSelectedGroup] = useState<TransformerGroup | null>(null);
   const [aiInsights, setAiInsights] = useState<InsightReport | null>(null);
   const [showComparison, setShowComparison] = useState(false);
+  const [showDeployInfo, setShowDeployInfo] = useState(false);
+  const [apiUrl, setApiUrl] = useState(() => localStorage.getItem('powergrid_api_url') || DEFAULT_SHEETY_API);
 
   const processData = (rawRows: any[]): TransformerGroup[] => {
     const grouped: { [sn: string]: TransformerReading[] } = {};
     
     rawRows.forEach(row => {
-      // Sheety retorna chaves em lowercase baseadas no header da planilha
       const sn = (row.sn || row.serie || row.id || 'N/A').toString();
       if (!grouped[sn]) grouped[sn] = [];
       
@@ -50,7 +52,6 @@ const App: React.FC = () => {
       const history = grouped[sn].sort((a, b) => new Date(a.data).getTime() - new Date(b.data).getTime());
       const lastReading = history[history.length - 1];
       
-      // Lógica simplificada IEEE C57.104
       let status = TransformerStatus.NORMAL;
       if (lastReading.c2h2 > 2 || lastReading.h2 > 500) status = TransformerStatus.CRITICO;
       else if (lastReading.c2h2 > 0.5 || lastReading.h2 > 100) status = TransformerStatus.ALERTA;
@@ -69,14 +70,18 @@ const App: React.FC = () => {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await fetch(SHEETY_API_URL);
+      const response = await fetch(apiUrl);
       if (!response.ok) throw new Error('Falha ao conectar com Planilha');
       const data = await response.json();
-      const processed = processData(data.trafo || []);
+      
+      // Tenta encontrar a chave correta (Sheety usa o nome da aba como chave do JSON)
+      const dataKey = Object.keys(data)[0];
+      const rows = data[dataKey] || [];
+      
+      const processed = processData(rows);
       setGroups(processed);
       setLastUpdated(new Date());
       
-      // Insights de IA após carregar dados
       if (processed.length > 0) {
         const insights = await getAIInsights(processed);
         setAiInsights(insights);
@@ -86,11 +91,19 @@ const App: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [apiUrl]);
 
   useEffect(() => { 
     fetchData();
   }, [fetchData]);
+
+  const changeApiUrl = () => {
+    const newUrl = prompt('Insira o endpoint da API Sheety:', apiUrl);
+    if (newUrl && newUrl.startsWith('http')) {
+      setApiUrl(newUrl);
+      localStorage.setItem('powergrid_api_url', newUrl);
+    }
+  };
 
   const toggleSelection = (sn: string) => {
     setSelectedSns(prev => 
@@ -130,16 +143,21 @@ const App: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
-            {selectedSns.length > 1 && (
-              <button 
-                onClick={() => setShowComparison(true)}
-                className="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-3 rounded-xl transition-all font-bold flex items-center gap-2 shadow-xl shadow-indigo-500/20 group"
-              >
-                <svg className="w-5 h-5 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
-                Comparar {selectedSns.length} Trafos
-              </button>
-            )}
+          <div className="flex items-center gap-3">
+             <button 
+              onClick={() => setShowDeployInfo(true)}
+              className="p-3 text-slate-400 hover:text-indigo-400 hover:bg-slate-900 rounded-xl transition-all border border-transparent hover:border-slate-800"
+              title="Guia de Hospedagem"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+            </button>
+            <button 
+              onClick={changeApiUrl}
+              className="p-3 text-slate-400 hover:text-white hover:bg-slate-900 rounded-xl transition-all border border-transparent hover:border-slate-800"
+              title="Configurar Planilha"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37a1.724 1.724 0 002.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+            </button>
             <button 
               onClick={fetchData}
               disabled={loading}
@@ -185,7 +203,6 @@ const App: React.FC = () => {
           <div className="lg:col-span-1 space-y-8">
             <AIAnalysisPanel insights={aiInsights} loading={loading} />
             
-            {/* Quick Metrics Card */}
             <div className="bg-slate-900/40 border border-slate-800/60 p-6 rounded-3xl backdrop-blur-sm">
               <h3 className="font-bold text-slate-400 uppercase text-[10px] tracking-[0.2em] mb-6 flex items-center gap-2">
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 2v-6m-8 13h12a2 2 0 002-2V5a2 2 0 00-2-2H6a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
@@ -214,7 +231,6 @@ const App: React.FC = () => {
           </div>
         </div>
 
-        {/* Modais */}
         {selectedGroup && (
           <DetailModal 
             group={selectedGroup} 
@@ -227,6 +243,10 @@ const App: React.FC = () => {
             groups={groups.filter(g => selectedSns.includes(g.sn))} 
             onClose={() => setShowComparison(false)} 
           />
+        )}
+
+        {showDeployInfo && (
+          <DeploymentInfo onClose={() => setShowDeployInfo(false)} />
         )}
       </div>
     </div>

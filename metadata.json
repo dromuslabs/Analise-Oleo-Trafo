@@ -1,5 +1,5 @@
 {
-  "name": "PowerGrid Monitor - Transformadores",
-  "description": "Painel industrial avançado para monitoramento em tempo real de transformadores de potência, integrado com IA para análise preditiva e insights operacionais.",
+  "name": "PowerGrid Monitor - Vanilla JS Version",
+  "description": "Dashboard industrial de alto desempenho em Vanilla JS, sem necessidade de build, otimizado para hospedasens estáticas.",
   "requestFramePermissions": []
 }

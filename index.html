@@ -4,25 +4,103 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PowerGrid Monitor</title>
+    <title>PowerGrid Monitor - Industrial DGA</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', sans-serif; }
+        .font-mono { font-family: 'JetBrains Mono', monospace; }
+        .glass { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(12px); border: 1px solid rgba(51, 65, 85, 0.5); }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+        @keyframes pulse-soft { 0%, 100% { opacity: 0.2; } 50% { opacity: 0.4; } }
+        .animate-pulse-soft { animation: pulse-soft 3s infinite; }
     </style>
 <script type="importmap">
 {
   "imports": {
-    "react": "https://esm.sh/react@^19.2.3",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
     "react/": "https://esm.sh/react@^19.2.3/",
-    "@google/genai": "https://esm.sh/@google/genai@^1.35.0",
+    "react": "https://esm.sh/react@^19.2.3",
+    "@google/genai": "https://esm.sh/@google/genai@^1.36.0",
     "recharts": "https://esm.sh/recharts@^3.6.0"
   }
 }
 </script>
 </head>
-<body class="bg-slate-950 text-slate-50 min-h-screen">
-    <div id="root"></div>
+<body class="bg-slate-950 text-slate-100 min-h-screen custom-scrollbar">
+    <div id="app" class="p-4 md:p-8 max-w-[1600px] mx-auto pb-24">
+        <!-- Header -->
+        <header class="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12 border-b border-slate-800 pb-8">
+            <div class="flex items-center gap-6">
+                <div class="relative">
+                    <div class="absolute inset-0 bg-indigo-500 blur-2xl opacity-20 animate-pulse-soft"></div>
+                    <div class="relative bg-gradient-to-br from-indigo-600 to-blue-700 p-4 rounded-2xl shadow-2xl">
+                        <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                    </div>
+                </div>
+                <div>
+                    <div class="flex items-center gap-3">
+                        <h1 class="text-3xl font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400">
+                            PowerGrid Monitor
+                        </h1>
+                        <span class="bg-emerald-500/10 text-emerald-400 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-500/20 uppercase tracking-widest">Live</span>
+                    </div>
+                    <p class="text-slate-500 font-medium text-sm mt-1" id="last-updated-text">Sincronizando ativos...</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-3">
+                <button onclick="app.showDeployGuide()" class="p-3 text-slate-400 hover:text-indigo-400 hover:bg-slate-900 rounded-xl transition-all border border-transparent hover:border-slate-800">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+                </button>
+                <button onclick="app.configApi()" class="p-3 text-slate-400 hover:text-white hover:bg-slate-900 rounded-xl transition-all border border-transparent hover:border-slate-800">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37a1.724 1.724 0 002.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                </button>
+                <button id="refresh-btn" onclick="app.fetchData()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-3 rounded-xl flex items-center gap-3 font-semibold transition-all shadow-lg shadow-indigo-500/20">
+                    <svg id="refresh-icon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                    Sincronizar Planilha
+                </button>
+            </div>
+        </header>
+
+        <!-- Stats Grid -->
+        <div id="stats-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12"></div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
+            <!-- Table Section -->
+            <div class="lg:col-span-3 space-y-8">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-xl font-bold flex items-center gap-2">Monitoramento de Ativos</h2>
+                    <div class="flex gap-4">
+                        <span class="flex items-center gap-1.5 text-xs text-slate-400"><span class="w-2 h-2 rounded-full bg-emerald-500"></span> Normal</span>
+                        <span class="flex items-center gap-1.5 text-xs text-slate-400"><span class="w-2 h-2 rounded-full bg-amber-500"></span> Alerta</span>
+                        <span class="flex items-center gap-1.5 text-xs text-slate-400"><span class="w-2 h-2 rounded-full bg-rose-500"></span> Crítico</span>
+                    </div>
+                </div>
+                <div id="list-container" class="glass rounded-[2rem] overflow-hidden shadow-2xl"></div>
+            </div>
+
+            <!-- Sidebar AI -->
+            <div class="lg:col-span-1 space-y-8">
+                <div id="ai-insights-container" class="bg-slate-900 border border-indigo-500/30 rounded-3xl p-6 shadow-2xl shadow-indigo-500/5 min-h-[300px]">
+                    <div class="animate-pulse space-y-4">
+                        <div class="h-6 bg-slate-800 rounded w-1/2"></div>
+                        <div class="h-20 bg-slate-800 rounded"></div>
+                        <div class="h-20 bg-slate-800 rounded"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modais -->
+    <div id="modal-container" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl"></div>
+    <div id="guide-container" class="hidden fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/95 backdrop-blur-md"></div>
+
+    <script type="module" src="./index.tsx"></script>
 </body>
 </html>
