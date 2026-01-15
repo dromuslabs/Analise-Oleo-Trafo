@@ -1,41 +1,30 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
-import { TransformerGroup, TrendAnalysis } from "../types";
+import { TransformerGroup, TrendAnalysis, InsightReport } from "../types";
 
-const getApiKey = () => {
-  try {
-    // @ts-ignore
-    return typeof process !== 'undefined' ? process.env.API_KEY : undefined;
-  } catch (e) {
-    return undefined;
-  }
-};
+// Inicialização segura - A chave é injetada via variável de ambiente no deploy
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
 
-export const getAIInsights = async (groups: TransformerGroup[]) => {
-  const apiKey = getApiKey();
-  if (!apiKey) return null;
+export const getAIInsights = async (groups: TransformerGroup[]): Promise<InsightReport | null> => {
+  if (!process.env.API_KEY) return null;
 
-  const ai = new GoogleGenAI({ apiKey });
-  
-  const summary = groups.map(g => ({
-    sn: g.sn,
+  const fleetSummary = groups.map(g => ({
     tag: g.tag,
-    currentGases: { 
+    sn: g.sn,
+    status: g.status,
+    gases: { 
       c2h2: g.lastReading.c2h2, 
       h2: g.lastReading.h2,
-      tcg: (g.lastReading.h2 + g.lastReading.ch4 + g.lastReading.c2h2 + g.lastReading.c2h4 + g.lastReading.c2h6 + g.lastReading.co)
-    },
-    status: g.status
+      tcg: g.lastReading.tcg
+    }
   }));
-
-  const prompt = `Atue como um Engenheiro Especialista em Diagnóstico de Transformadores (DGA - IEEE C57.104). 
-  Analise esta frota: ${JSON.stringify(summary)}. 
-  Forneça um resumo executivo de saúde, identifique equipamentos em estado crítico e recomende ações imediatas.`;
 
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: prompt,
+      model: "gemini-3-pro-preview",
+      contents: `Atue como Engenheiro Especialista em Manutenção Preditiva (Especialista em DGA - IEEE C57.104). 
+      Analise esta frota de transformadores: ${JSON.stringify(fleetSummary)}. 
+      Forneça um resumo executivo da saúde da frota, liste problemas críticos detectados e recomende ações imediatas.`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -49,6 +38,7 @@ export const getAIInsights = async (groups: TransformerGroup[]) => {
         }
       }
     });
+
     return response.text ? JSON.parse(response.text) : null;
   } catch (error) {
     console.error("Erro AI Insights:", error);
@@ -57,20 +47,14 @@ export const getAIInsights = async (groups: TransformerGroup[]) => {
 };
 
 export const analyzeTrends = async (group: TransformerGroup): Promise<TrendAnalysis | null> => {
-  const apiKey = getApiKey();
-  if (!apiKey) return null;
-
-  const ai = new GoogleGenAI({ apiKey });
-
-  const prompt = `Analise a tendência temporal de gases do transformador SN: ${group.sn}.
-  Histórico: ${JSON.stringify(group.history)}.
-  Calcule a taxa de geração de gases (ppm/dia). Identifique se há indícios de falha.
-  Responda em JSON rigoroso.`;
+  if (!process.env.API_KEY) return null;
 
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: prompt,
+      model: "gemini-3-pro-preview",
+      contents: `Analise a tendência temporal de gases do transformador TAG: ${group.tag} (SN: ${group.sn}).
+      Histórico técnico: ${JSON.stringify(group.history)}.
+      Identifique padrões de falha (Arco Elétrico, Descarga Térmica, Corona) e calcule o nível de risco técnico.`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -85,8 +69,10 @@ export const analyzeTrends = async (group: TransformerGroup): Promise<TrendAnaly
         }
       }
     });
+
     return response.text ? JSON.parse(response.text) : null;
   } catch (error) {
+    console.error("Erro Trend Analysis:", error);
     return null;
   }
 };
