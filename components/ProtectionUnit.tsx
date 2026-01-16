@@ -4,14 +4,18 @@ import { ProtectionUnit as ProtectionUnitType } from '../types';
 
 interface ProtectionUnitProps {
   unit: ProtectionUnitType;
+  onClick?: () => void;
 }
 
-const ProtectionUnit: React.FC<ProtectionUnitProps> = ({ unit }) => {
+const ProtectionUnit: React.FC<ProtectionUnitProps> = ({ unit, onClick }) => {
   const isCommActive = unit.statusComunica === 'Ativo';
   const isProtNormal = unit.statusProtecao === 'Normal';
 
   return (
-    <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl relative overflow-hidden group hover:border-slate-700 transition-all shadow-xl">
+    <div 
+      onClick={onClick}
+      className="bg-slate-900 border border-slate-800 p-6 rounded-3xl relative overflow-hidden group hover:border-indigo-500/40 cursor-pointer transition-all shadow-xl hover:shadow-indigo-500/10"
+    >
       {/* Barra lateral indicadora de status de comunicação */}
       <div className={`absolute top-0 left-0 w-1.5 h-full ${isCommActive ? 'bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.5)]' : 'bg-rose-500 shadow-[0_0_15px_rgba(244,63,94,0.5)]'}`}></div>
       
@@ -28,11 +32,10 @@ const ProtectionUnit: React.FC<ProtectionUnitProps> = ({ unit }) => {
         </div>
       </div>
 
-      <p className="text-lg font-black text-white mb-1 uppercase tracking-tight">{unit.unit}</p>
+      <p className="text-lg font-black text-white mb-1 uppercase tracking-tight group-hover:text-indigo-400 transition-colors">{unit.unit}</p>
       <p className="text-[9px] text-slate-600 font-mono mb-6">{unit.painel}</p>
       
       <div className="space-y-4">
-        {/* Campo solicitado: Status de Comunicação */}
         <div className="bg-slate-950/50 p-3 rounded-xl border border-slate-800/50">
           <div className="flex justify-between items-center">
             <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider">Comunicação</span>

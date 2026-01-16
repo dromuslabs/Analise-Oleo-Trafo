@@ -20,44 +20,44 @@ const HeatDetailModal: React.FC<HeatDetailModalProps> = ({ data, onClose }) => {
   const progressWidth = Math.min(Math.max((data.temperatura / 100) * 100, 0), 100);
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl animate-in fade-in duration-300">
-      <div className="bg-[#0f172a] border border-slate-800 rounded-[3rem] w-full max-w-2xl shadow-[0_0_80px_rgba(249,115,22,0.15)] overflow-hidden">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-4 bg-black/90 backdrop-blur-xl animate-in fade-in duration-300">
+      <div className="bg-[#0f172a] border border-slate-800 rounded-2xl lg:rounded-[3rem] w-full max-w-2xl max-h-[90vh] shadow-[0_0_80px_rgba(249,115,22,0.15)] overflow-hidden flex flex-col">
         
         {/* Header */}
-        <div className="p-8 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
-          <div className="flex items-center gap-4">
-            <div className={`p-3 rounded-2xl ${data.temperatura > 70 ? 'bg-orange-600 animate-pulse' : 'bg-slate-800'}`}>
-              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.879 16.121A3 3 0 1012.015 11L11 14l-1.121 2.121z" /></svg>
+        <div className="p-4 sm:p-8 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div className={`p-2 sm:p-3 rounded-xl sm:rounded-2xl ${data.temperatura > 70 ? 'bg-orange-600 animate-pulse' : 'bg-slate-800'}`}>
+              <svg className="w-5 h-5 sm:w-6 sm:h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.879 16.121A3 3 0 1012.015 11L11 14l-1.121 2.121z" /></svg>
             </div>
             <div>
-              <h2 className="text-2xl font-black text-white tracking-tighter uppercase">{data.equipamento}</h2>
-              <p className="text-slate-500 font-mono text-[10px] uppercase tracking-widest">Subestação: {data.se}</p>
+              <h2 className="text-base sm:text-2xl font-black text-white tracking-tighter uppercase leading-tight">{data.equipamento}</h2>
+              <p className="text-slate-500 font-mono text-[8px] sm:text-[10px] uppercase tracking-widest truncate max-w-[150px] sm:max-w-none">{data.se}</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-3 hover:bg-rose-500/10 text-slate-500 hover:text-rose-500 rounded-2xl transition-all">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+          <button onClick={onClose} className="p-2 sm:p-3 hover:bg-rose-500/10 text-slate-500 hover:text-rose-500 rounded-xl transition-all">
+            <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         </div>
 
-        <div className="p-10 space-y-10">
+        <div className="p-4 sm:p-10 space-y-6 sm:space-y-10 overflow-y-auto custom-scrollbar flex-1">
           
           {/* Main Temp Display */}
-          <div className="flex flex-col items-center justify-center py-6 text-center">
-            <span className={`text-[10px] font-black uppercase tracking-[0.3em] mb-4 ${severity.color}`}>Status Térmico: {severity.label}</span>
+          <div className="flex flex-col items-center justify-center py-4 text-center">
+            <span className={`text-[8px] sm:text-[10px] font-black uppercase tracking-[0.3em] mb-2 sm:mb-4 ${severity.color}`}>Status: {severity.label}</span>
             <div className="relative inline-block">
-               <span className={`text-8xl font-black tracking-tighter ${data.temperatura > 70 ? 'text-orange-500' : 'text-white'}`}>
+               <span className={`text-6xl sm:text-8xl font-black tracking-tighter ${data.temperatura > 70 ? 'text-orange-500' : 'text-white'}`}>
                  {data.temperatura}°C
                </span>
             </div>
           </div>
 
           {/* Visual Gauge */}
-          <div className="space-y-4">
-            <div className="flex justify-between text-[10px] font-black text-slate-600 uppercase tracking-widest px-1">
+          <div className="space-y-3 sm:space-y-4">
+            <div className="flex justify-between text-[7px] sm:text-[10px] font-black text-slate-600 uppercase tracking-widest px-1">
               <span>0°C</span>
-              <span>Limite Operacional (100°C)</span>
+              <span>Limite (100°C)</span>
             </div>
-            <div className="h-6 bg-slate-950 rounded-full border border-slate-800 p-1 overflow-hidden relative">
+            <div className="h-4 sm:h-6 bg-slate-950 rounded-full border border-slate-800 p-0.5 sm:p-1 overflow-hidden relative">
                <div 
                  className={`h-full rounded-full transition-all duration-1000 ease-out ${
                    data.temperatura > 75 ? 'bg-gradient-to-r from-orange-500 to-rose-600' : 
@@ -66,37 +66,36 @@ const HeatDetailModal: React.FC<HeatDetailModalProps> = ({ data, onClose }) => {
                  }`}
                  style={{ width: `${progressWidth}%` }}
                >
-                 <div className="absolute inset-0 bg-white/20 animate-[pulse_2s_infinite]"></div>
+                 <div className="absolute inset-0 bg-white/10 animate-pulse"></div>
                </div>
             </div>
           </div>
 
           {/* Technical Details Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6 border-t border-slate-800/50">
-            <div className="bg-slate-900/50 p-6 rounded-3xl border border-slate-800/50">
-              <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">Recomendação Técnica</h4>
-              <p className="text-slate-300 text-sm leading-relaxed">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 pt-4 sm:pt-6 border-t border-slate-800/50">
+            <div className="bg-slate-900/50 p-4 sm:p-6 rounded-xl sm:rounded-3xl border border-slate-800/50">
+              <h4 className="text-[8px] sm:text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 sm:mb-3">Parecer Técnico</h4>
+              <p className="text-slate-300 text-xs sm:text-sm leading-relaxed">
                 {data.temperatura > 75 
-                  ? "Intervenção imediata recomendada. Verificar conexão e reaperto sob desenergização." 
+                  ? "Intervenção imediata recomendada. Verificar conexão." 
                   : data.temperatura > 55 
-                  ? "Acompanhamento preventivo quinzenal. Planejar limpeza e inspeção de contatos." 
-                  : "Condição estável. Próxima inspeção conforme cronograma anual."}
+                  ? "Acompanhamento preventivo quinzenal necessário." 
+                  : "Condição estável. Seguir plano anual."}
               </p>
             </div>
-            <div className="bg-slate-900/50 p-6 rounded-3xl border border-slate-800/50 flex flex-col justify-center">
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-[10px] font-black text-slate-600 uppercase">Delta T</span>
-                <span className="text-white font-mono text-xs">Simulado</span>
+            <div className="bg-slate-900/50 p-4 sm:p-6 rounded-xl sm:rounded-3xl border border-slate-800/50 flex flex-col justify-center">
+              <div className="flex justify-between items-center mb-1 sm:mb-2">
+                <span className="text-[8px] sm:text-[10px] font-black text-slate-600 uppercase">Delta T</span>
               </div>
-              <p className="text-lg font-black text-white">+{Math.max(0, data.temperatura - 35).toFixed(1)}°C <span className="text-[10px] text-slate-500">sobre Ambiente</span></p>
+              <p className="text-base sm:text-lg font-black text-white">+{Math.max(0, data.temperatura - 35).toFixed(1)}°C <span className="text-[8px] sm:text-[10px] text-slate-500">Acima do Ambiente</span></p>
             </div>
           </div>
 
           <button 
             onClick={onClose}
-            className="w-full py-5 bg-slate-800 hover:bg-slate-700 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all"
+            className="w-full py-4 sm:py-5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl sm:rounded-2xl font-black text-[9px] sm:text-[10px] uppercase tracking-widest transition-all"
           >
-            Fechar Relatório Térmico
+            Fechar Relatório
           </button>
         </div>
       </div>
